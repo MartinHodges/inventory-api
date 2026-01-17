@@ -22,5 +22,8 @@ public interface InvitationRepository extends JpaRepository<Invitation, UUID> {
     @Query("SELECT i FROM Invitation i WHERE i.inventory = :inventory AND i.acceptedAt IS NULL ORDER BY i.createdAt DESC")
     List<Invitation> findPendingByInventory(@Param("inventory") Inventory inventory);
 
+    @Query("SELECT i FROM Invitation i WHERE i.email = :email AND i.acceptedAt IS NULL AND i.expiresAt > CURRENT_TIMESTAMP ORDER BY i.createdAt DESC")
+    List<Invitation> findPendingByEmail(@Param("email") String email);
+
     List<Invitation> findByInventory(Inventory inventory);
 }

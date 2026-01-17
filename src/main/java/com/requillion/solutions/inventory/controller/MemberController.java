@@ -32,14 +32,6 @@ public class MemberController {
         return ResponseEntity.ok(MemberResponseDTO.fromEntities(members));
     }
 
-    @GetMapping("/pending")
-    public ResponseEntity<List<MemberResponseDTO>> getPendingMembers(@PathVariable UUID inventoryId) {
-        LoggerUtil.debug(log, "getPendingMembers: inventory=%s", inventoryId);
-        RequestContext context = UserContext.getContext();
-        List<InventoryMember> members = memberService.getPendingMembers(context.getUser(), inventoryId);
-        return ResponseEntity.ok(MemberResponseDTO.fromEntities(members));
-    }
-
     @PutMapping("/{memberId}")
     public ResponseEntity<MemberResponseDTO> updateMember(
             @PathVariable UUID inventoryId,

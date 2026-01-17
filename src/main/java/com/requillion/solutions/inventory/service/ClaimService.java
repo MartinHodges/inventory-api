@@ -80,7 +80,7 @@ public class ClaimService {
         Item item = getItemWithAccess(user, inventoryId, itemId);
 
         // Only admins/owners can see all claims
-        if (!canUserManageInventory(user, item.getInventory())) {
+        if (!canUserViewInventory(user, item.getInventory())) {
             throw new NotAuthorizedException(
                     "You do not have permission to view claims for this item",
                     "Item: %s, User: %s", itemId, user.getId());

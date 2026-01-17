@@ -1,5 +1,6 @@
 package com.requillion.solutions.inventory.controller;
 
+import com.requillion.solutions.inventory.dto.DashboardItemDTO;
 import com.requillion.solutions.inventory.dto.InventoryRequestDTO;
 import com.requillion.solutions.inventory.dto.InventoryResponseDTO;
 import com.requillion.solutions.inventory.dto.InventoryWithMeta;
@@ -31,6 +32,14 @@ public class InventoryController {
         RequestContext context = UserContext.getContext();
         List<InventoryWithMeta> inventories = inventoryService.getInventories(context.getUser());
         return ResponseEntity.ok(InventoryResponseDTO.toDTO(inventories));
+    }
+
+    @GetMapping("/dashboard")
+    public ResponseEntity<List<DashboardItemDTO>> getDashboardItems() {
+        LoggerUtil.debug(log, "getDashboardItems");
+        RequestContext context = UserContext.getContext();
+        List<DashboardItemDTO> items = inventoryService.getDashboardItems(context.getUser());
+        return ResponseEntity.ok(items);
     }
 
     @GetMapping("/{inventoryId}")

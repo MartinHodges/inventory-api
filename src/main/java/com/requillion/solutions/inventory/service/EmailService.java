@@ -18,15 +18,15 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${app.base-url:http://localhost:3000}")
-    private String baseUrl;
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
 
     @Value("${spring.mail.username:noreply@inventory.app}")
     private String fromEmail;
 
     @Async
     public void sendInvitation(Invitation invitation, String inventoryName, String inviterName) {
-        String acceptUrl = baseUrl + "/invitations/" + invitation.getToken();
+        String acceptUrl = frontendUrl + "/invitations/" + invitation.getToken();
 
         String subject = "You've been invited to " + inventoryName;
         String body = String.format("""
@@ -52,18 +52,16 @@ public class EmailService {
     }
 
     @Async
-    public void sendMemberApproved(InventoryMember member, String inventoryName) {
-        String inventoryUrl = baseUrl + "/inventories/" + member.getInventory().getId();
+    public void sendWelcomeEmail(InventoryMember member, String inventoryName) {
+        String inventoryUrl = frontendUrl + "/inventories/" + member.getInventory().getId();
 
-        String subject = "Your access to " + inventoryName + " has been approved";
+        String subject = "Welcome to " + inventoryName;
         String body = String.format("""
             Hi %s,
 
-            Your request to access "%s" has been approved.
+            Welcome to "%s"! You now have %s access to this inventory.
 
-            You now have %s access to this inventory.
-
-            Click here to view: %s
+            Click here to get started: %s
             """,
                 member.getUser().getFirstName(),
                 inventoryName,
@@ -72,32 +70,8 @@ public class EmailService {
         );
 
         sendEmail(member.getUser().getEmail(), subject, body);
-        LoggerUtil.info(log, "Sent approval notification to %s for inventory %s",
+        LoggerUtil.info(log, "Sent welcome email to %s for inventory %s",
                 member.getUser().getEmail(), member.getInventory().getId());
-    }
-
-    @Async
-    public void sendNewMemberNotification(InventoryMember newMember, String adminEmail, String inventoryName) {
-        String settingsUrl = baseUrl + "/inventories/" + newMember.getInventory().getId() + "/settings";
-
-        String subject = "New member request for " + inventoryName;
-        String body = String.format("""
-            Hi,
-
-            %s %s (%s) has accepted an invitation to "%s" and is pending your approval.
-
-            Click here to review: %s
-            """,
-                newMember.getUser().getFirstName(),
-                newMember.getUser().getLastName(),
-                newMember.getUser().getEmail(),
-                inventoryName,
-                settingsUrl
-        );
-
-        sendEmail(adminEmail, subject, body);
-        LoggerUtil.info(log, "Sent new member notification to admin %s for inventory %s",
-                adminEmail, newMember.getInventory().getId());
     }
 
     private void sendEmail(String to, String subject, String body) {

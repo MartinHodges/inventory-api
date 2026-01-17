@@ -1,11 +1,13 @@
 package com.requillion.solutions.inventory.service;
 
+import com.requillion.solutions.inventory.dto.DashboardItemDTO;
 import com.requillion.solutions.inventory.dto.InventoryRequestDTO;
 import com.requillion.solutions.inventory.dto.InventoryWithMeta;
 import com.requillion.solutions.inventory.exception.BadInputException;
 import com.requillion.solutions.inventory.exception.NotAuthorizedException;
 import com.requillion.solutions.inventory.exception.NotFoundException;
 import com.requillion.solutions.inventory.model.*;
+import com.requillion.solutions.inventory.repository.InvitationRepository;
 import com.requillion.solutions.inventory.repository.InventoryMemberRepository;
 import com.requillion.solutions.inventory.repository.InventoryRepository;
 import com.requillion.solutions.inventory.repository.ItemRepository;
@@ -29,6 +31,8 @@ public class InventoryService {
     private final InventoryRepository inventoryRepository;
     private final InventoryMemberRepository memberRepository;
     private final ItemRepository itemRepository;
+    private final InvitationRepository invitationRepository;
+    private final MemberService memberService;
 
     public List<InventoryWithMeta> getInventories(@NonNull User user) {
         List<InventoryWithMeta> result = new ArrayList<>();
@@ -56,6 +60,44 @@ public class InventoryService {
         return result;
     }
 
+    public List<DashboardItemDTO> getDashboardItems(@NonNull User user) {
+        List<DashboardItemDTO> result = new ArrayList<>();
+
+        // Get owned inventories
+        List<Inventory> owned = inventoryRepository.findByOwner(user);
+        for (Inventory inv : owned) {
+            int count = (int) itemRepository.countByInventoryAndIsDeletedFalse(inv);
+            result.add(new DashboardItemDTO(inv.getId(), inv.getName(), inv.getDescription(), 
+                    true, MemberRole.ADMIN, count));
+        }
+
+        // Get inventories user is a member of (with ACTIVE status)
+        List<InventoryMember> memberships = memberRepository.findByUser(user);
+        for (InventoryMember membership : memberships) {
+            if (membership.getStatus() == MemberStatus.ACTIVE) {
+                Inventory inv = membership.getInventory();
+                if (!inv.getOwner().equals(user)) { // Don't duplicate owned inventories
+                    int count = (int) itemRepository.countByInventoryAndIsDeletedFalse(inv);
+                    result.add(new DashboardItemDTO(inv.getId(), inv.getName(), inv.getDescription(),
+                            false, membership.getRole(), count));
+                }
+            }
+        }
+
+        // Get pending invitations
+        List<Invitation> pendingInvitations = invitationRepository.findPendingByEmail(user.getEmail());
+        for (Invitation invitation : pendingInvitations) {
+            Inventory inv = invitation.getInventory();
+            String inviterName = invitation.getInvitedBy().getFirstName() + " " + 
+                    invitation.getInvitedBy().getLastName();
+            result.add(new DashboardItemDTO(inv.getId(), inv.getName(), inv.getDescription(),
+                    invitation.getRole(), invitation.getToken(), invitation.getExpiresAt(), inviterName));
+        }
+
+        LoggerUtil.info(log, "Retrieved %d dashboard items for user %s", result.size(), user.getId());
+        return result;
+    }
+
     public InventoryWithMeta getInventory(@NonNull User user, @NonNull UUID inventoryId) {
         Inventory inventory = inventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new NotFoundException(
@@ -72,9 +114,15 @@ public class InventoryService {
                             "You do not have access to this inventory",
                             "Inventory: %s, User: %s", inventoryId, user.getId()));
 
+            // Activate member on first access if pending
+            if (membership.getStatus() == MemberStatus.PENDING) {
+                memberService.activateMemberOnFirstAccess(user, inventoryId);
+                membership.setStatus(MemberStatus.ACTIVE); // Update local object
+            }
+
             if (membership.getStatus() != MemberStatus.ACTIVE) {
                 throw new NotAuthorizedException(
-                        "Your access to this inventory is pending approval",
+                        "Your access to this inventory is not active",
                         "Inventory: %s, User: %s, Status: %s",
                         inventoryId, user.getId(), membership.getStatus());
             }

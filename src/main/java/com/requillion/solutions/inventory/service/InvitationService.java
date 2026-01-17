@@ -84,6 +84,7 @@ public class InvitationService {
     }
 
     public Invitation getInvitationByToken(@NonNull String token) {
+        LoggerUtil.debug(log, "Looking up invitation by token: %s", token.substring(0, Math.min(8, token.length())) + "...");
         return invitationRepository.findByToken(token)
                 .orElseThrow(() -> new NotFoundException(
                         "Invitation not found or has expired",
@@ -127,19 +128,19 @@ public class InvitationService {
         invitation.setAcceptedAt(Instant.now());
         invitationRepository.save(invitation);
 
-        // Create membership with PENDING status
+        // Create membership with ACTIVE status (immediate activation upon acceptance)
         InventoryMember member = new InventoryMember();
         member.setInventory(inventory);
         member.setUser(user);
         member.setRole(invitation.getRole());
-        member.setStatus(MemberStatus.PENDING);
+        member.setStatus(MemberStatus.ACTIVE);
         member = memberRepository.save(member);
 
-        LoggerUtil.info(log, "User %s accepted invitation %s to inventory %s",
-                user.getId(), invitation.getId(), inventory.getId());
+        LoggerUtil.info(log, "User %s accepted invitation %s to inventory %s with role %s",
+                user.getId(), invitation.getId(), inventory.getId(), invitation.getRole());
 
-        // Notify admins
-        notifyAdminsOfNewMember(member, inventory);
+        // Send welcome email
+        emailService.sendWelcomeEmail(member, inventory.getName());
 
         return member;
     }
@@ -181,28 +182,6 @@ public class InvitationService {
         }
         return memberRepository.existsByInventoryAndUserAndStatusAndRoleIn(
                 inventory, user, MemberStatus.ACTIVE, List.of(MemberRole.ADMIN));
-    }
-
-    private void notifyAdminsOfNewMember(InventoryMember newMember, Inventory inventory) {
-        // Notify owner
-        emailService.sendNewMemberNotification(
-                newMember,
-                inventory.getOwner().getEmail(),
-                inventory.getName()
-        );
-
-        // Notify other admins
-        List<InventoryMember> admins = memberRepository.findByInventoryAndRoleAndStatus(
-                inventory, MemberRole.ADMIN, MemberStatus.ACTIVE);
-        for (InventoryMember admin : admins) {
-            if (!admin.getUser().equals(newMember.getUser())) {
-                emailService.sendNewMemberNotification(
-                        newMember,
-                        admin.getUser().getEmail(),
-                        inventory.getName()
-                );
-            }
-        }
     }
 
     private String generateToken() {

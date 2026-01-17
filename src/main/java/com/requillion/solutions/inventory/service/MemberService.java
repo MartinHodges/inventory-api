@@ -28,12 +28,7 @@ public class MemberService {
 
     public List<InventoryMember> getMembers(@NonNull User user, @NonNull UUID inventoryId) {
         Inventory inventory = getInventoryWithAdminAccess(user, inventoryId);
-        return memberRepository.findByInventory(inventory);
-    }
-
-    public List<InventoryMember> getPendingMembers(@NonNull User user, @NonNull UUID inventoryId) {
-        Inventory inventory = getInventoryWithAdminAccess(user, inventoryId);
-        return memberRepository.findByInventoryAndStatus(inventory, MemberStatus.PENDING);
+        return memberRepository.findByInventoryAndStatus(inventory, MemberStatus.ACTIVE);
     }
 
     public InventoryMember updateMemberRole(@NonNull User user, @NonNull UUID inventoryId,
@@ -52,7 +47,7 @@ public class MemberService {
         }
 
         member.setRole(newRole);
-        member = memberRepository.save(member);
+        member = memberRepository.saveAndFlush(member);
 
         LoggerUtil.info(log, "Updated member %s role to %s in inventory %s",
                 memberId, newRole, inventoryId);
@@ -75,19 +70,29 @@ public class MemberService {
                     "Inventory: %s, Member: %s", inventoryId, memberId);
         }
 
-        MemberStatus previousStatus = member.getStatus();
         member.setStatus(newStatus);
         member = memberRepository.save(member);
 
-        LoggerUtil.info(log, "Updated member %s status from %s to %s in inventory %s",
-                memberId, previousStatus, newStatus, inventoryId);
-
-        // Send notification if approved
-        if (previousStatus == MemberStatus.PENDING && newStatus == MemberStatus.ACTIVE) {
-            emailService.sendMemberApproved(member, inventory.getName());
-        }
+        LoggerUtil.info(log, "Updated member %s status to %s in inventory %s",
+                memberId, newStatus, inventoryId);
 
         return member;
+    }
+
+    public void activateMemberOnFirstAccess(@NonNull User user, @NonNull UUID inventoryId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        memberRepository.findByInventoryAndUser(inventory, user)
+                .filter(member -> member.getStatus() == MemberStatus.PENDING)
+                .ifPresent(member -> {
+                    member.setStatus(MemberStatus.ACTIVE);
+                    memberRepository.save(member);
+                    LoggerUtil.info(log, "Activated member %s for inventory %s on first access",
+                            user.getId(), inventoryId);
+                });
     }
 
     public void removeMember(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID memberId) {
