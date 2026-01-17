@@ -1,0 +1,8 @@
+spring:
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.requillion.solutions.inventory: DEBUG
+    org.springframework.web: DEBUG
