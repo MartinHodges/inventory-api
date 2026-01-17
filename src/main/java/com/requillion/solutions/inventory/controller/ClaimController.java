@@ -72,4 +72,15 @@ public class ClaimController {
         claimService.unassignItem(context.getUser(), inventoryId, itemId);
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/{claimId}")
+    public ResponseEntity<Void> deleteClaim(
+            @PathVariable UUID inventoryId,
+            @PathVariable UUID itemId,
+            @PathVariable UUID claimId) {
+        LoggerUtil.debug(log, "deleteClaim: inventory=%s, item=%s, claim=%s", inventoryId, itemId, claimId);
+        RequestContext context = UserContext.getContext();
+        claimService.deleteClaim(context.getUser(), inventoryId, itemId, claimId);
+        return ResponseEntity.noContent().build();
+    }
 }

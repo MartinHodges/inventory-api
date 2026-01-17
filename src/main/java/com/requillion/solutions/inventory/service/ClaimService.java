@@ -146,6 +146,31 @@ public class ClaimService {
         LoggerUtil.info(log, "Item %s unassigned from user %s", itemId, assignedClaim.getUser().getId());
     }
 
+    public void deleteClaim(@NonNull User user, @NonNull UUID inventoryId,
+                            @NonNull UUID itemId, @NonNull UUID claimId) {
+        Item item = getItemWithAccess(user, inventoryId, itemId);
+
+        if (!canUserManageInventory(user, item.getInventory())) {
+            throw new NotAuthorizedException(
+                    "You do not have permission to remove claims in this inventory",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        ItemClaim claim = claimRepository.findById(claimId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Claim not found",
+                        "Claim: %s", claimId));
+
+        if (!claim.getItem().equals(item)) {
+            throw new BadInputException(
+                    "Claim does not belong to this item",
+                    "Claim: %s, Item: %s", claimId, itemId);
+        }
+
+        claimRepository.delete(claim);
+        LoggerUtil.info(log, "Admin %s removed claim %s from item %s", user.getId(), claimId, itemId);
+    }
+
     private Item getItemWithAccess(User user, UUID inventoryId, UUID itemId) {
         Inventory inventory = inventoryRepository.findById(inventoryId)
                 .orElseThrow(() -> new NotFoundException(
