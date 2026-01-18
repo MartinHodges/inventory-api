@@ -244,8 +244,10 @@ public class ItemService {
             String assignedToName = isAssigned
                     ? assigned.getUser().getFirstName() + " " + assigned.getUser().getLastName()
                     : null;
+            boolean currentUserClaimed = itemClaims.stream()
+                    .anyMatch(c -> c.getUser().equals(user));
 
-            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName);
+            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed);
         }).toList();
     }
 

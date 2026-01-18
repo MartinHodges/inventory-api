@@ -15,10 +15,12 @@ public record ItemWithThumbnailDTO(
         int claimCount,
         boolean isAssigned,
         String assignedToName,
+        boolean currentUserClaimed,
         Instant createdAt,
         Instant updatedAt
 ) {
-    public static ItemWithThumbnailDTO toDTO(Item item, int claimCount, boolean isAssigned, String assignedToName) {
+    public static ItemWithThumbnailDTO toDTO(Item item, int claimCount, boolean isAssigned,
+                                              String assignedToName, boolean currentUserClaimed) {
         String thumbnail = null;
         if (item.getThumbnail() != null && item.getThumbnail().length > 0) {
             thumbnail = Base64.getEncoder().encodeToString(item.getThumbnail());
@@ -32,6 +34,7 @@ public record ItemWithThumbnailDTO(
                 claimCount,
                 isAssigned,
                 assignedToName,
+                currentUserClaimed,
                 item.getCreatedAt(),
                 item.getUpdatedAt()
         );
