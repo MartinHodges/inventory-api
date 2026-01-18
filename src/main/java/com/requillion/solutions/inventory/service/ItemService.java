@@ -70,7 +70,8 @@ public class ItemService {
 
     public Item createItem(@NonNull User user, @NonNull UUID inventoryId,
                            @NonNull ItemRequestDTO dto, byte[] imageData) {
-        Inventory inventory = inventoryRepository.findById(inventoryId)
+        // Use pessimistic lock to prevent race condition on reference number generation
+        Inventory inventory = inventoryRepository.findByIdWithLock(inventoryId)
                 .orElseThrow(() -> new NotFoundException(
                         "Inventory not found",
                         "Inventory: %s", inventoryId));
