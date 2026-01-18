@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: inventory-sec-route
+  namespace: inventory
+  annotations:
+    nginx.ingress.kubernetes.io/auth-url: "http://oauth2-proxy.inventory.svc.cluster.local/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://inventory.requillion-solutions.cloud/oauth2/start?rd=$scheme://$host$request_uri"
+    nginx.ingress.kubernetes.io/auth-proxy-pass-headers: "X-Forwarded-Host,X-Forwarded-Proto"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Groups,X-Auth-Request-Access-Token,X-Auth-Request-Email,X-Auth-Request-Preferred-Username"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: inventory.requillion-solutions.cloud
+      http:
+        paths:
+          - path: /api/secure
+            pathType: Prefix
+            backend:
+              service:
+                name: inventory-ui-service
+                port:
+                  number: 80

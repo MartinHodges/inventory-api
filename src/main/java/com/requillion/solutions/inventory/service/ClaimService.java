@@ -1,5 +1,6 @@
 package com.requillion.solutions.inventory.service;
 
+import com.requillion.solutions.inventory.dto.InventoryEventDTO;
 import com.requillion.solutions.inventory.exception.BadInputException;
 import com.requillion.solutions.inventory.exception.NotAuthorizedException;
 import com.requillion.solutions.inventory.exception.NotFoundException;
@@ -28,6 +29,7 @@ public class ClaimService {
     private final ItemRepository itemRepository;
     private final InventoryRepository inventoryRepository;
     private final InventoryMemberRepository memberRepository;
+    private final InventoryEventService eventService;
 
     public ItemClaim createClaim(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID itemId) {
         Item item = getItemWithAccess(user, inventoryId, itemId);
@@ -54,6 +56,8 @@ public class ClaimService {
         claim = claimRepository.save(claim);
         LoggerUtil.info(log, "User %s expressed interest in item %s", user.getId(), itemId);
 
+        eventService.publishEvent(InventoryEventDTO.claimCreated(inventoryId, itemId, claim.getId()));
+
         return claim;
     }
 
@@ -72,8 +76,11 @@ public class ClaimService {
                     "Claim: %s", claim.getId());
         }
 
+        UUID claimId = claim.getId();
         claimRepository.delete(claim);
         LoggerUtil.info(log, "User %s withdrew interest in item %s", user.getId(), itemId);
+
+        eventService.publishEvent(InventoryEventDTO.claimDeleted(inventoryId, itemId, claimId));
     }
 
     public List<ItemClaim> getClaims(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID itemId) {
@@ -123,6 +130,8 @@ public class ClaimService {
         claim = claimRepository.save(claim);
 
         LoggerUtil.info(log, "Item %s assigned to user %s", itemId, claim.getUser().getId());
+        eventService.publishEvent(InventoryEventDTO.itemAssigned(inventoryId, itemId, claim.getId()));
+
         return claim;
     }
 
@@ -144,6 +153,7 @@ public class ClaimService {
         claimRepository.save(assignedClaim);
 
         LoggerUtil.info(log, "Item %s unassigned from user %s", itemId, assignedClaim.getUser().getId());
+        eventService.publishEvent(InventoryEventDTO.itemUnassigned(inventoryId, itemId));
     }
 
     public void deleteClaim(@NonNull User user, @NonNull UUID inventoryId,
@@ -169,6 +179,8 @@ public class ClaimService {
 
         claimRepository.delete(claim);
         LoggerUtil.info(log, "Admin %s removed claim %s from item %s", user.getId(), claimId, itemId);
+
+        eventService.publishEvent(InventoryEventDTO.claimDeleted(inventoryId, itemId, claimId));
     }
 
     private Item getItemWithAccess(User user, UUID inventoryId, UUID itemId) {

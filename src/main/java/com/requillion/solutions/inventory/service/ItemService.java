@@ -1,5 +1,6 @@
 package com.requillion.solutions.inventory.service;
 
+import com.requillion.solutions.inventory.dto.InventoryEventDTO;
 import com.requillion.solutions.inventory.dto.ItemRequestDTO;
 import com.requillion.solutions.inventory.dto.ItemResponseDTO;
 import com.requillion.solutions.inventory.dto.ItemWithThumbnailDTO;
@@ -32,6 +33,7 @@ public class ItemService {
     private final InventoryService inventoryService;
     private final ImageService imageService;
     private final ItemClaimRepository claimRepository;
+    private final InventoryEventService eventService;
 
     public List<Item> getItems(@NonNull User user, @NonNull UUID inventoryId) {
         Inventory inventory = inventoryRepository.findById(inventoryId)
@@ -109,6 +111,8 @@ public class ItemService {
         LoggerUtil.info(log, "Created item %s (#%d) in inventory %s",
                 item.getId(), item.getReferenceNumber(), inventoryId);
 
+        eventService.publishEvent(InventoryEventDTO.itemCreated(inventoryId, item.getId()));
+
         return item;
     }
 
@@ -134,6 +138,8 @@ public class ItemService {
         item = itemRepository.save(item);
 
         LoggerUtil.info(log, "Updated item %s", item.getId());
+        eventService.publishEvent(InventoryEventDTO.itemUpdated(inventoryId, item.getId()));
+
         return item;
     }
 
@@ -166,6 +172,8 @@ public class ItemService {
 
         item = itemRepository.save(item);
         LoggerUtil.info(log, "Updated image for item %s", item.getId());
+        eventService.publishEvent(InventoryEventDTO.itemUpdated(inventoryId, item.getId()));
+
         return item;
     }
 
@@ -191,6 +199,7 @@ public class ItemService {
         itemRepository.save(item);
 
         LoggerUtil.info(log, "Soft-deleted item %s from inventory %s", itemId, inventoryId);
+        eventService.publishEvent(InventoryEventDTO.itemDeleted(inventoryId, itemId));
     }
 
     public byte[] getItemImage(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID itemId) {

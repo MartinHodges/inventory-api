@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oauth2-proxy-secrets
+  namespace: inventory
+type: Opaque
+stringData:
+  client-secret: <client secret>
+  cookie-secret: <cookie secret>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  namespace: inventory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+          args:
+            - --provider=oidc
+            - --client-id=nginx-ingress
+            - --client-secret=$(OAUTH2_PROXY_CLIENT_SECRET)
+            - --redirect-url=https://inventory.requillion-solutions.cloud/oauth2/callback
+            #          - --upstream=http://inventory-ui-service.inventory.svc.cluster.local:80
+            - --cookie-secret=$(OAUTH2_PROXY_COOKIE_SECRET)
+            - --cookie-secure=true
+            - --cookie-httponly=true
+            - --cookie-samesite=lax
+            - --cookie-domain=.requillion-solutions.cloud
+            - --scope=openid email profile
+            - --oidc-issuer-url=https://iam.b30.online/realms/requillion-solutions
+            - --skip-provider-button=true
+            - --http-address=0.0.0.0:4180
+            - --email-domain=*
+            - --set-xauthrequest=true
+            - --pass-access-token=true
+            - --reverse-proxy=true
+            - --whitelist-domain=.requillion-solutions.cloud
+            - --whitelist-domain=iam.b30.online
+            - --backend-logout-url=https://iam.b30.online/realms/requillion-solutions/protocol/openid-connect/logout?id_token_hint={id_token}&post_logout_redirect_uri=https://inventory.requillion-solutions.cloud
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oauth2-proxy-secrets
+                  key: client-secret
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: oauth2-proxy-secrets
+                  key: cookie-secret
+          ports:
+            - containerPort: 4180
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy
+  namespace: inventory
+spec:
+  selector:
+    app: oauth2-proxy
+  ports:
+    - name: http
+      port: 80
+      targetPort: 4180
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oauth2-proxy-ingress
+  namespace: inventory
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: inventory.requillion-solutions.cloud
+      http:
+        paths:
+          - path: /oauth2/
+            pathType: Prefix
+            backend:
+              service:
+                name: oauth2-proxy
+                port:
+                  number: 80

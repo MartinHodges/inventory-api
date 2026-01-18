@@ -203,6 +203,14 @@ public class InventoryService {
                 .orElse(false);
     }
 
+    public boolean canUserViewInventory(@NonNull User user, @NonNull UUID inventoryId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+        return canUserViewInventory(user, inventory);
+    }
+
     public boolean canUserEditInventory(@NonNull User user, @NonNull Inventory inventory) {
         if (inventory.getOwner().equals(user)) {
             return true;

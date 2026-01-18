@@ -1,0 +1,41 @@
+package com.requillion.solutions.inventory.controller;
+
+import com.requillion.solutions.inventory.exception.NotAuthorizedException;
+import com.requillion.solutions.inventory.model.User;
+import com.requillion.solutions.inventory.security.RequestContext;
+import com.requillion.solutions.inventory.security.UserContext;
+import com.requillion.solutions.inventory.service.InventoryEventService;
+import com.requillion.solutions.inventory.service.InventoryService;
+import com.requillion.solutions.inventory.util.LoggerUtil;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1/inventories/{inventoryId}/events")
+@RequiredArgsConstructor
+@Slf4j
+public class SseController {
+
+    private final InventoryEventService eventService;
+    private final InventoryService inventoryService;
+
+    @GetMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter subscribe(@PathVariable UUID inventoryId) {
+        LoggerUtil.debug(log, "SSE subscribe request for inventory %s", inventoryId);
+        RequestContext context = UserContext.getContext();
+        User user = context.getUser();
+
+        if (!inventoryService.canUserViewInventory(user, inventoryId)) {
+            throw new NotAuthorizedException(
+                    "You do not have access to this inventory",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        return eventService.subscribe(inventoryId, user);
+    }
+}

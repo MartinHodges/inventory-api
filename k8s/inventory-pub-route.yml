@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: inventory-pub-route
+  namespace: inventory
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: inventory.requillion-solutions.cloud
+      http:
+        paths:
+          - path: /api/public
+            pathType: Prefix
+            backend:
+              service:
+                name: inventory-ui-service
+                port:
+                  number: 80
+          - path: /api/login
+            pathType: Prefix
+            backend:
+              service:
+                name: inventory-ui-service
+                port:
+                  number: 80
+          - path: /_next
+            pathType: Prefix
+            backend:
+              service:
+                name: inventory-ui-service
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: inventory-ui-service
+                port:
+                  number: 80
