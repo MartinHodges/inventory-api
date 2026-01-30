@@ -21,6 +21,10 @@ public record InventoryEventDTO(
         return new InventoryEventDTO("ITEM_DELETED", inventoryId, itemId, null, System.currentTimeMillis());
     }
 
+    public static InventoryEventDTO itemUndeleted(UUID inventoryId, UUID itemId) {
+        return new InventoryEventDTO("ITEM_UNDELETED", inventoryId, itemId, null, System.currentTimeMillis());
+    }
+
     public static InventoryEventDTO claimCreated(UUID inventoryId, UUID itemId, UUID claimId) {
         return new InventoryEventDTO("CLAIM_CREATED", inventoryId, itemId, claimId, System.currentTimeMillis());
     }

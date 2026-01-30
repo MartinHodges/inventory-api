@@ -204,6 +204,30 @@ public class ItemService {
         eventService.publishEvent(InventoryEventDTO.itemDeleted(inventoryId, itemId));
     }
 
+    public void undeleteItem(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID itemId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        if (!inventoryService.canUserEditInventory(user, inventory)) {
+            throw new NotAuthorizedException(
+                    "You do not have permission to undelete items in this inventory",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        Item item = itemRepository.findByInventoryAndId(inventory, itemId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Item not found",
+                        "Item: %s, Inventory: %s", itemId, inventoryId));
+
+        item.setIsDeleted(false);
+        itemRepository.save(item);
+
+        LoggerUtil.info(log, "Undeleted item %s from inventory %s", itemId, inventoryId);
+        eventService.publishEvent(InventoryEventDTO.itemUndeleted(inventoryId, itemId));
+    }
+
     public byte[] getItemImage(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID itemId) {
         Item item = getItem(user, inventoryId, itemId);
 
@@ -247,8 +271,11 @@ public class ItemService {
                         "Category not found",
                         "Category: %s, Inventory: %s", categoryId, inventoryId));
 
-        List<Item> items = itemRepository.findByCategoryAndIsDeletedFalseOrderByReferenceNumberAsc(category);
-        LoggerUtil.info(log, "Retrieved %d items from category %s", items.size(), categoryId);
+        boolean canEdit = inventoryService.canUserEditInventory(user, inventory);
+        List<Item> items = canEdit
+                ? itemRepository.findByCategoryOrderByReferenceNumberAsc(category)
+                : itemRepository.findByCategoryAndIsDeletedFalseOrderByReferenceNumberAsc(category);
+        LoggerUtil.info(log, "Retrieved %d items from category %s (includeDeleted=%s)", items.size(), categoryId, canEdit);
         return items;
     }
 

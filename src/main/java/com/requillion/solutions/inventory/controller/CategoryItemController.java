@@ -37,6 +37,17 @@ public class CategoryItemController {
         return ResponseEntity.ok(items);
     }
 
+    @PatchMapping("/{itemId}/undelete")
+    public ResponseEntity<Void> undeleteItem(
+            @PathVariable UUID inventoryId,
+            @PathVariable UUID categoryId,
+            @PathVariable UUID itemId) {
+        LoggerUtil.debug(log, "undeleteItem: inventory=%s, category=%s, item=%s", inventoryId, categoryId, itemId);
+        RequestContext context = UserContext.getContext();
+        itemService.undeleteItem(context.getUser(), inventoryId, itemId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ItemResponseDTO> createItem(
             @PathVariable UUID inventoryId,

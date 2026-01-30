@@ -18,6 +18,7 @@ public record ItemWithThumbnailDTO(
         boolean isAssigned,
         String assignedToName,
         boolean currentUserClaimed,
+        boolean isDeleted,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -39,6 +40,7 @@ public record ItemWithThumbnailDTO(
                 isAssigned,
                 assignedToName,
                 currentUserClaimed,
+                item.getIsDeleted(),
                 item.getCreatedAt(),
                 item.getUpdatedAt()
         );

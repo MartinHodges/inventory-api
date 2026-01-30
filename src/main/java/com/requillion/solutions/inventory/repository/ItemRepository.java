@@ -28,6 +28,10 @@ public interface ItemRepository extends JpaRepository<Item, UUID> {
 
     List<Item> findByCategoryAndIsDeletedFalseOrderByReferenceNumberAsc(Category category);
 
+    List<Item> findByCategoryOrderByReferenceNumberAsc(Category category);
+
+    Optional<Item> findByInventoryAndId(Inventory inventory, UUID id);
+
     long countByCategoryAndIsDeletedFalse(Category category);
 
     @Query("SELECT COALESCE(MAX(i.referenceNumber), 0) FROM Item i WHERE i.category = :category")
