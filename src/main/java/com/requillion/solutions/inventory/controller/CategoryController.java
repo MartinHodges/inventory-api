@@ -1,5 +1,6 @@
 package com.requillion.solutions.inventory.controller;
 
+import com.requillion.solutions.inventory.dto.CategoryRecentItemCountDTO;
 import com.requillion.solutions.inventory.dto.CategoryRequestDTO;
 import com.requillion.solutions.inventory.dto.CategoryResponseDTO;
 import com.requillion.solutions.inventory.dto.CategoryVisibilityDTO;
@@ -86,6 +87,17 @@ public class CategoryController {
         Category category = categoryService.setCategoryVisibility(
                 context.getUser(), inventoryId, categoryId, dto.hidden());
         return ResponseEntity.ok(CategoryResponseDTO.toDTO(category, 0));
+    }
+
+    @GetMapping("/recent-counts")
+    public ResponseEntity<List<CategoryRecentItemCountDTO>> getRecentItemCounts(
+            @PathVariable UUID inventoryId,
+            @RequestParam(defaultValue = "7") int days) {
+        LoggerUtil.debug(log, "getRecentItemCounts: inventory=%s, days=%d", inventoryId, days);
+        RequestContext context = UserContext.getContext();
+        List<CategoryRecentItemCountDTO> counts = categoryService.getRecentItemCounts(
+                context.getUser(), inventoryId, days);
+        return ResponseEntity.ok(counts);
     }
 
     @PutMapping("/reorder")

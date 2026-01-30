@@ -1,5 +1,6 @@
 package com.requillion.solutions.inventory.service;
 
+import com.requillion.solutions.inventory.dto.CategoryRecentItemCountDTO;
 import com.requillion.solutions.inventory.dto.CategoryRequestDTO;
 import com.requillion.solutions.inventory.dto.CategoryWithItemCount;
 import com.requillion.solutions.inventory.exception.BadInputException;
@@ -18,8 +19,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -176,6 +181,33 @@ public class CategoryService {
         LoggerUtil.info(log, "Set category %s hidden=%s", category.getId(), hidden);
 
         return category;
+    }
+
+    public List<CategoryRecentItemCountDTO> getRecentItemCounts(@NonNull User user, @NonNull UUID inventoryId, int days) {
+        Inventory inventory = getInventoryWithAccess(user, inventoryId);
+        boolean canEdit = inventoryService.canUserEditInventory(user, inventory);
+
+        Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
+        List<Object[]> rows = itemRepository.countRecentItemsByCategory(inventory, since);
+
+        // If user can't edit, filter out hidden categories
+        Set<UUID> visibleCategoryIds;
+        if (!canEdit) {
+            visibleCategoryIds = categoryRepository.findByInventoryOrderByDisplayOrderAsc(inventory).stream()
+                    .filter(cat -> !cat.getHidden())
+                    .map(Category::getId)
+                    .collect(Collectors.toSet());
+        } else {
+            visibleCategoryIds = null;
+        }
+
+        return rows.stream()
+                .filter(row -> visibleCategoryIds == null || visibleCategoryIds.contains((UUID) row[0]))
+                .map(row -> new CategoryRecentItemCountDTO(
+                        (UUID) row[0],
+                        ((Number) row[1]).intValue(),
+                        ((Number) row[2]).intValue()))
+                .toList();
     }
 
     private Inventory getInventoryWithAccess(User user, UUID inventoryId) {
