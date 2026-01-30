@@ -1,0 +1,2 @@
+ALTER TABLE inventory.categories
+    ADD COLUMN hidden BOOLEAN NOT NULL DEFAULT TRUE;

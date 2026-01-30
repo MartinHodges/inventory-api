@@ -1,5 +1,6 @@
 package com.requillion.solutions.inventory.repository;
 
+import com.requillion.solutions.inventory.model.Category;
 import com.requillion.solutions.inventory.model.Inventory;
 import com.requillion.solutions.inventory.model.Item;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -24,4 +25,11 @@ public interface ItemRepository extends JpaRepository<Item, UUID> {
     Integer findMaxReferenceNumber(@Param("inventory") Inventory inventory);
 
     long countByInventoryAndIsDeletedFalse(Inventory inventory);
+
+    List<Item> findByCategoryAndIsDeletedFalseOrderByReferenceNumberAsc(Category category);
+
+    long countByCategoryAndIsDeletedFalse(Category category);
+
+    @Query("SELECT COALESCE(MAX(i.referenceNumber), 0) FROM Item i WHERE i.category = :category")
+    Integer findMaxReferenceNumberByCategory(@Param("category") Category category);
 }

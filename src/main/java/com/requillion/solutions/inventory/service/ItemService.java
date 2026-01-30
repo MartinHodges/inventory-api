@@ -8,6 +8,7 @@ import com.requillion.solutions.inventory.exception.BadInputException;
 import com.requillion.solutions.inventory.exception.NotAuthorizedException;
 import com.requillion.solutions.inventory.exception.NotFoundException;
 import com.requillion.solutions.inventory.model.*;
+import com.requillion.solutions.inventory.repository.CategoryRepository;
 import com.requillion.solutions.inventory.repository.InventoryRepository;
 import com.requillion.solutions.inventory.repository.ItemClaimRepository;
 import com.requillion.solutions.inventory.repository.ItemRepository;
@@ -30,6 +31,7 @@ public class ItemService {
 
     private final ItemRepository itemRepository;
     private final InventoryRepository inventoryRepository;
+    private final CategoryRepository categoryRepository;
     private final InventoryService inventoryService;
     private final ImageService imageService;
     private final ItemClaimRepository claimRepository;
@@ -224,6 +226,123 @@ public class ItemService {
         }
 
         return item.getThumbnail();
+    }
+
+    // Category-based methods
+
+    public List<Item> getItemsByCategory(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID categoryId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        if (!inventoryService.canUserViewInventory(user, inventory)) {
+            throw new NotAuthorizedException(
+                    "You do not have access to this inventory",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        Category category = categoryRepository.findByInventoryAndId(inventory, categoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Category not found",
+                        "Category: %s, Inventory: %s", categoryId, inventoryId));
+
+        List<Item> items = itemRepository.findByCategoryAndIsDeletedFalseOrderByReferenceNumberAsc(category);
+        LoggerUtil.info(log, "Retrieved %d items from category %s", items.size(), categoryId);
+        return items;
+    }
+
+    public Item createItemInCategory(@NonNull User user, @NonNull UUID inventoryId,
+                                     @NonNull UUID categoryId, @NonNull ItemRequestDTO dto, byte[] imageData) {
+        Inventory inventory = inventoryRepository.findByIdWithLock(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        if (!inventoryService.canUserEditInventory(user, inventory)) {
+            throw new NotAuthorizedException(
+                    "You do not have permission to add items to this inventory",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        Category category = categoryRepository.findByInventoryAndId(inventory, categoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Category not found",
+                        "Category: %s, Inventory: %s", categoryId, inventoryId));
+
+        // Generate reference number within category
+        Integer maxRef = itemRepository.findMaxReferenceNumberByCategory(category);
+        int newRefNumber = (maxRef != null ? maxRef : 0) + 1;
+
+        Item item = new Item();
+        item.setInventory(inventory);
+        item.setCategory(category);
+        item.setReferenceNumber(newRefNumber);
+        item.setDescription(dto.description());
+
+        // Process image if provided
+        if (imageData != null && imageData.length > 0) {
+            try {
+                item.setImage(imageService.compressImage(imageData, newRefNumber));
+                item.setThumbnail(imageService.createThumbnail(imageData));
+                LoggerUtil.debug(log, "Processed image for item: original=%d, compressed=%d, thumbnail=%d",
+                        imageData.length, item.getImage().length, item.getThumbnail().length);
+            } catch (IOException e) {
+                throw new BadInputException(
+                        "Failed to process image",
+                        "Error: %s", e.getMessage());
+            }
+        }
+
+        item = itemRepository.save(item);
+        LoggerUtil.info(log, "Created item %s (#%d) in category %s",
+                item.getId(), item.getReferenceNumber(), categoryId);
+
+        eventService.publishEvent(InventoryEventDTO.itemCreated(inventoryId, item.getId()));
+
+        return item;
+    }
+
+    public List<ItemWithThumbnailDTO> getItemsWithThumbnailsByCategory(@NonNull User user,
+            @NonNull UUID inventoryId, @NonNull UUID categoryId) {
+        List<Item> items = getItemsByCategory(user, inventoryId, categoryId);
+
+        if (items.isEmpty()) {
+            return List.of();
+        }
+
+        // Get all claims for these items in one query
+        List<UUID> itemIds = items.stream().map(Item::getId).toList();
+        List<ItemClaim> allClaims = claimRepository.findByItemIdIn(itemIds);
+
+        // Group claims by item ID
+        Map<UUID, List<ItemClaim>> claimsByItem = allClaims.stream()
+                .collect(Collectors.groupingBy(c -> c.getItem().getId()));
+
+        return items.stream().map(item -> {
+            List<ItemClaim> itemClaims = claimsByItem.getOrDefault(item.getId(), List.of());
+            int claimCount = itemClaims.size();
+            ItemClaim assigned = itemClaims.stream()
+                    .filter(c -> c.getStatus() == ClaimStatus.ASSIGNED)
+                    .findFirst()
+                    .orElse(null);
+            boolean isAssigned = assigned != null;
+            String assignedToName = isAssigned
+                    ? assigned.getUser().getFirstName() + " " + assigned.getUser().getLastName()
+                    : null;
+            boolean currentUserClaimed = itemClaims.stream()
+                    .anyMatch(c -> c.getUser().equals(user));
+
+            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed);
+        }).toList();
+    }
+
+    public ItemResponseDTO createItemInCategoryDTO(@NonNull User user, @NonNull UUID inventoryId,
+                                                    @NonNull UUID categoryId, @NonNull ItemRequestDTO dto,
+                                                    byte[] imageData) {
+        Item item = createItemInCategory(user, inventoryId, categoryId, dto, imageData);
+        // New items have no claims
+        return ItemResponseDTO.toDTO(item, 0, false, null, false);
     }
 
     // DTO methods with claim information

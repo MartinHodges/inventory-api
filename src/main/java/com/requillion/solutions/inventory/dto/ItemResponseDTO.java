@@ -8,6 +8,8 @@ import java.util.UUID;
 public record ItemResponseDTO(
         UUID id,
         UUID inventoryId,
+        UUID categoryId,
+        String categoryName,
         int referenceNumber,
         String description,
         boolean hasImage,
@@ -23,6 +25,8 @@ public record ItemResponseDTO(
         return new ItemResponseDTO(
                 item.getId(),
                 item.getInventory().getId(),
+                item.getCategory() != null ? item.getCategory().getId() : null,
+                item.getCategory() != null ? item.getCategory().getName() : null,
                 item.getReferenceNumber(),
                 item.getDescription(),
                 item.getImage() != null && item.getImage().length > 0,

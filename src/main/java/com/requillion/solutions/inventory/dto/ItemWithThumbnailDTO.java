@@ -9,6 +9,8 @@ import java.util.UUID;
 public record ItemWithThumbnailDTO(
         UUID id,
         UUID inventoryId,
+        UUID categoryId,
+        String categoryName,
         int referenceNumber,
         String description,
         String thumbnailBase64,
@@ -28,6 +30,8 @@ public record ItemWithThumbnailDTO(
         return new ItemWithThumbnailDTO(
                 item.getId(),
                 item.getInventory().getId(),
+                item.getCategory() != null ? item.getCategory().getId() : null,
+                item.getCategory() != null ? item.getCategory().getName() : null,
                 item.getReferenceNumber(),
                 item.getDescription(),
                 thumbnail,

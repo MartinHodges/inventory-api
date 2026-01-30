@@ -10,10 +10,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "items", schema = "inventory")
+@Table(name = "categories", schema = "inventory")
 @Data
 @NoArgsConstructor
-public class Item {
+public class Category {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -23,24 +23,17 @@ public class Item {
     @JoinColumn(name = "inventory_id", nullable = false)
     private Inventory inventory;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id")
-    private Category category;
-
-    @Column(name = "reference_number", nullable = false)
-    private Integer referenceNumber;
-
     @Column(nullable = false)
+    private String name;
+
+    @Column
     private String description;
 
-    @Column(columnDefinition = "BYTEA")
-    private byte[] image;
+    @Column(name = "display_order", nullable = false)
+    private Integer displayOrder = 0;
 
-    @Column(columnDefinition = "BYTEA")
-    private byte[] thumbnail;
-
-    @Column(name = "is_deleted", nullable = false)
-    private Boolean isDeleted = false;
+    @Column(nullable = false)
+    private Boolean hidden = true;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -52,7 +45,7 @@ public class Item {
 
     @Override
     public String toString() {
-        return String.format("[%s] #%d - %s", id, referenceNumber, description);
+        return String.format("[%s] %s", id, name);
     }
 
     @Override
@@ -60,7 +53,7 @@ public class Item {
         if (this == other) return true;
         if (other == null || getClass() != other.getClass()) return false;
         if (id == null) return false;
-        return id.equals(((Item) other).id);
+        return id.equals(((Category) other).id);
     }
 
     @Override
