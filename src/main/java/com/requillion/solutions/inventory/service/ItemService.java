@@ -372,6 +372,51 @@ public class ItemService {
         return ItemResponseDTO.toDTO(item, 0, false, null, false);
     }
 
+    public List<ItemWithThumbnailDTO> getClaimedItemsWithThumbnails(@NonNull User user,
+            @NonNull UUID inventoryId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        if (!inventoryService.canUserViewInventory(user, inventory)) {
+            throw new NotAuthorizedException(
+                    "You do not have access to this inventory",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        List<ItemClaim> userClaims = claimRepository.findByUserAndInventoryId(user, inventoryId);
+        List<Item> items = userClaims.stream().map(ItemClaim::getItem).toList();
+
+        if (items.isEmpty()) {
+            return List.of();
+        }
+
+        // Get all claims for these items in one query
+        List<UUID> itemIds = items.stream().map(Item::getId).toList();
+        List<ItemClaim> allClaims = claimRepository.findByItemIdIn(itemIds);
+
+        // Group claims by item ID
+        Map<UUID, List<ItemClaim>> claimsByItem = allClaims.stream()
+                .collect(Collectors.groupingBy(c -> c.getItem().getId()));
+
+        return items.stream().map(item -> {
+            List<ItemClaim> itemClaims = claimsByItem.getOrDefault(item.getId(), List.of());
+            int claimCount = itemClaims.size();
+            ItemClaim assigned = itemClaims.stream()
+                    .filter(c -> c.getStatus() == ClaimStatus.ASSIGNED)
+                    .findFirst()
+                    .orElse(null);
+            boolean isAssigned = assigned != null;
+            String assignedToName = isAssigned
+                    ? assigned.getUser().getFirstName() + " " + assigned.getUser().getLastName()
+                    : null;
+            boolean currentUserClaimed = true;
+
+            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed);
+        }).toList();
+    }
+
     // DTO methods with claim information
 
     public List<ItemWithThumbnailDTO> getItemsWithThumbnails(@NonNull User user, @NonNull UUID inventoryId) {

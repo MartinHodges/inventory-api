@@ -28,4 +28,10 @@ public interface ItemClaimRepository extends JpaRepository<ItemClaim, UUID> {
 
     @Query("SELECT c FROM ItemClaim c WHERE c.item.id IN :itemIds")
     List<ItemClaim> findByItemIdIn(@Param("itemIds") List<UUID> itemIds);
+
+    @Query("SELECT c FROM ItemClaim c JOIN FETCH c.item i " +
+           "LEFT JOIN FETCH i.category " +
+           "WHERE i.inventory.id = :inventoryId AND c.user = :user AND i.isDeleted = false " +
+           "ORDER BY i.referenceNumber ASC")
+    List<ItemClaim> findByUserAndInventoryId(@Param("user") User user, @Param("inventoryId") UUID inventoryId);
 }

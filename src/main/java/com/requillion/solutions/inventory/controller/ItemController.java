@@ -35,6 +35,15 @@ public class ItemController {
         return ResponseEntity.ok(items);
     }
 
+    @GetMapping("/my-claims")
+    public ResponseEntity<List<ItemWithThumbnailDTO>> getMyClaimedItems(@PathVariable UUID inventoryId) {
+        LoggerUtil.debug(log, "getMyClaimedItems: inventory=%s", inventoryId);
+        RequestContext context = UserContext.getContext();
+        List<ItemWithThumbnailDTO> items = itemService.getClaimedItemsWithThumbnails(
+                context.getUser(), inventoryId);
+        return ResponseEntity.ok(items);
+    }
+
     @GetMapping("/{itemId}")
     public ResponseEntity<ItemResponseDTO> getItem(
             @PathVariable UUID inventoryId,
