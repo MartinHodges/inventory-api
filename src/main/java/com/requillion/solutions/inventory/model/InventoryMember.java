@@ -43,6 +43,9 @@ public class InventoryMember {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "finished_at")
+    private Instant finishedAt;
+
     @Override
     public boolean equals(Object other) {
         if (this == other) return true;

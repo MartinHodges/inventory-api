@@ -41,7 +41,7 @@ public class InventoryService {
         List<Inventory> owned = inventoryRepository.findByOwner(user);
         for (Inventory inv : owned) {
             int count = (int) itemRepository.countByInventoryAndIsDeletedFalse(inv);
-            result.add(new InventoryWithMeta(inv, true, MemberRole.ADMIN, count));
+            result.add(new InventoryWithMeta(inv, true, MemberRole.ADMIN, count, false));
         }
 
         // Get inventories user is a member of (with ACTIVE status)
@@ -51,7 +51,8 @@ public class InventoryService {
                 Inventory inv = membership.getInventory();
                 if (!inv.getOwner().equals(user)) { // Don't duplicate owned inventories
                     int count = (int) itemRepository.countByInventoryAndIsDeletedFalse(inv);
-                    result.add(new InventoryWithMeta(inv, false, membership.getRole(), count));
+                    result.add(new InventoryWithMeta(inv, false, membership.getRole(), count,
+                            membership.getFinishedAt() != null));
                 }
             }
         }
@@ -107,6 +108,7 @@ public class InventoryService {
         // Check access
         boolean isOwner = inventory.getOwner().equals(user);
         MemberRole role = null;
+        boolean isFinished = false;
 
         if (!isOwner) {
             InventoryMember membership = memberRepository.findByInventoryAndUser(inventory, user)
@@ -127,10 +129,11 @@ public class InventoryService {
                         inventoryId, user.getId(), membership.getStatus());
             }
             role = membership.getRole();
+            isFinished = membership.getFinishedAt() != null;
         }
 
         int itemCount = (int) itemRepository.countByInventoryAndIsDeletedFalse(inventory);
-        return new InventoryWithMeta(inventory, isOwner, role, itemCount);
+        return new InventoryWithMeta(inventory, isOwner, role, itemCount, isFinished);
     }
 
     public Inventory createInventory(@NonNull User owner, @NonNull InventoryRequestDTO dto) {

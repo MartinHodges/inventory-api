@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -118,6 +119,58 @@ public class MemberService {
 
         memberRepository.delete(member);
         LoggerUtil.info(log, "Removed member %s from inventory %s", memberId, inventoryId);
+    }
+
+    public void markAsFinished(@NonNull User user, @NonNull UUID inventoryId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        if (inventory.getOwner().equals(user)) {
+            throw new BadInputException(
+                    "Owners cannot mark themselves as finished",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        InventoryMember member = memberRepository.findByInventoryAndUser(inventory, user)
+                .orElseThrow(() -> new NotAuthorizedException(
+                        "You are not a member of this inventory",
+                        "Inventory: %s, User: %s", inventoryId, user.getId()));
+
+        if (member.getFinishedAt() == null) {
+            member.setFinishedAt(Instant.now());
+            memberRepository.save(member);
+            LoggerUtil.info(log, "Member %s marked as finished in inventory %s", user.getId(), inventoryId);
+        }
+    }
+
+    public void setMemberFinished(@NonNull User user, @NonNull UUID inventoryId,
+                                   @NonNull UUID memberId, boolean finished) {
+        Inventory inventory = getInventoryWithAdminAccess(user, inventoryId);
+
+        InventoryMember member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Member not found",
+                        "Member: %s", memberId));
+
+        if (!member.getInventory().equals(inventory)) {
+            throw new NotFoundException(
+                    "Member not found in this inventory",
+                    "Inventory: %s, Member: %s", inventoryId, memberId);
+        }
+
+        if (finished && member.getFinishedAt() == null) {
+            member.setFinishedAt(Instant.now());
+            memberRepository.save(member);
+            LoggerUtil.info(log, "Admin %s marked member %s as finished in inventory %s",
+                    user.getId(), memberId, inventoryId);
+        } else if (!finished && member.getFinishedAt() != null) {
+            member.setFinishedAt(null);
+            memberRepository.save(member);
+            LoggerUtil.info(log, "Admin %s reset finished for member %s in inventory %s",
+                    user.getId(), memberId, inventoryId);
+        }
     }
 
     private Inventory getInventoryWithAdminAccess(User user, UUID inventoryId) {

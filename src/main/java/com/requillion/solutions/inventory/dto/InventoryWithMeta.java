@@ -7,5 +7,6 @@ public record InventoryWithMeta(
         Inventory inventory,
         boolean isOwner,
         MemberRole userRole,
-        int itemCount
+        int itemCount,
+        boolean isFinished
 ) {}

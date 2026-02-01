@@ -48,7 +48,7 @@ public class InventoryController {
         RequestContext context = UserContext.getContext();
         InventoryWithMeta inventory = inventoryService.getInventory(context.getUser(), inventoryId);
         return ResponseEntity.ok(InventoryResponseDTO.toDTO(
-                inventory.inventory(), inventory.isOwner(), inventory.userRole(), inventory.itemCount()));
+                inventory.inventory(), inventory.isOwner(), inventory.userRole(), inventory.itemCount(), inventory.isFinished()));
     }
 
     @PostMapping
@@ -58,7 +58,7 @@ public class InventoryController {
         RequestContext context = UserContext.getContext();
         Inventory inventory = inventoryService.createInventory(context.getUser(), dto);
         return ResponseEntity.ok(InventoryResponseDTO.toDTO(
-                inventory, true, null, 0));
+                inventory, true, null, 0, false));
     }
 
     @PutMapping("/{inventoryId}")
@@ -70,7 +70,7 @@ public class InventoryController {
         Inventory inventory = inventoryService.updateInventory(context.getUser(), inventoryId, dto);
         InventoryWithMeta meta = inventoryService.getInventory(context.getUser(), inventoryId);
         return ResponseEntity.ok(InventoryResponseDTO.toDTO(
-                inventory, meta.isOwner(), meta.userRole(), meta.itemCount()));
+                inventory, meta.isOwner(), meta.userRole(), meta.itemCount(), meta.isFinished()));
     }
 
     @DeleteMapping("/{inventoryId}")

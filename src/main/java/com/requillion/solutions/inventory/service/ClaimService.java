@@ -43,6 +43,9 @@ public class ClaimService {
                     "Inventory: %s, User: %s", inventoryId, user.getId());
         }
 
+        // Finished claimants cannot create new claims (admins can)
+        checkNotFinishedClaimant(user, item.getInventory());
+
         // Check if user already claimed this item
         if (claimRepository.findByItemAndUser(item, user).isPresent()) {
             throw new BadInputException(
@@ -65,6 +68,9 @@ public class ClaimService {
 
     public void withdrawClaim(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID itemId) {
         Item item = getItemWithAccess(user, inventoryId, itemId);
+
+        // Finished claimants cannot withdraw claims (admins can)
+        checkNotFinishedClaimant(user, item.getInventory());
 
         ItemClaim claim = claimRepository.findByItemAndUser(item, user)
                 .orElseThrow(() -> new NotFoundException(
@@ -218,23 +224,24 @@ public class ClaimService {
         // Build response: owner first, then members sorted by name
         List<AllClaimsResponseDTO> result = new ArrayList<>();
 
-        // Add owner
+        // Add owner (owner never has finished status)
         result.add(buildMemberClaims(owner.getId(),
                 owner.getFirstName() + " " + owner.getLastName(),
-                null, claimsByUser, claimCountByItem));
+                null, false, claimsByUser, claimCountByItem));
 
         // Add members (excluding owner to avoid duplicates)
         for (InventoryMember member : members) {
             if (member.getUser().equals(owner)) continue;
             result.add(buildMemberClaims(member.getUser().getId(),
                     member.getUser().getFirstName() + " " + member.getUser().getLastName(),
-                    member.getRole(), claimsByUser, claimCountByItem));
+                    member.getRole(), member.getFinishedAt() != null, claimsByUser, claimCountByItem));
         }
 
         return result;
     }
 
     private AllClaimsResponseDTO buildMemberClaims(UUID userId, String userName, MemberRole role,
+                                                    boolean isFinished,
                                                     Map<UUID, List<ItemClaim>> claimsByUser,
                                                     Map<UUID, Long> claimCountByItem) {
         List<ItemClaim> userClaims = claimsByUser.getOrDefault(userId, List.of());
@@ -242,7 +249,7 @@ public class ClaimService {
                 .map(claim -> ClaimedItemDTO.fromClaim(claim,
                         claimCountByItem.getOrDefault(claim.getItem().getId(), 0L).intValue()))
                 .toList();
-        return new AllClaimsResponseDTO(userId, userName, role, claimedItems);
+        return new AllClaimsResponseDTO(userId, userName, role, isFinished, claimedItems);
     }
 
     private Item getItemWithAccess(User user, UUID inventoryId, UUID itemId) {
@@ -287,5 +294,18 @@ public class ClaimService {
         }
         return memberRepository.existsByInventoryAndUserAndStatusAndRoleIn(
                 inventory, user, MemberStatus.ACTIVE, List.of(MemberRole.ADMIN));
+    }
+
+    private void checkNotFinishedClaimant(User user, Inventory inventory) {
+        if (inventory.getOwner().equals(user)) {
+            return; // Owner is never restricted
+        }
+        memberRepository.findByInventoryAndUser(inventory, user)
+                .filter(m -> m.getRole() == MemberRole.CLAIMANT && m.getFinishedAt() != null)
+                .ifPresent(m -> {
+                    throw new BadInputException(
+                            "You have marked yourself as finished and can no longer change claims",
+                            "Member: %s, Inventory: %s", m.getId(), inventory.getId());
+                });
     }
 }

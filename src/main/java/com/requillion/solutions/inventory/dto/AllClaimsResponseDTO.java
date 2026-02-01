@@ -9,6 +9,7 @@ public record AllClaimsResponseDTO(
         UUID memberId,
         String userName,
         MemberRole role,
+        boolean isFinished,
         List<ClaimedItemDTO> claims
 ) {
 }

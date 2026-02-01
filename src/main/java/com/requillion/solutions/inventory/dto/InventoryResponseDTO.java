@@ -16,10 +16,11 @@ public record InventoryResponseDTO(
         boolean isOwner,
         MemberRole userRole,
         int itemCount,
+        boolean isFinished,
         Instant createdAt,
         Instant updatedAt
 ) {
-    public static InventoryResponseDTO toDTO(Inventory inventory, boolean isOwner, MemberRole userRole, int itemCount) {
+    public static InventoryResponseDTO toDTO(Inventory inventory, boolean isOwner, MemberRole userRole, int itemCount, boolean isFinished) {
         return new InventoryResponseDTO(
                 inventory.getId(),
                 inventory.getName(),
@@ -29,6 +30,7 @@ public record InventoryResponseDTO(
                 isOwner,
                 isOwner ? MemberRole.ADMIN : userRole,
                 itemCount,
+                isFinished,
                 inventory.getCreatedAt(),
                 inventory.getUpdatedAt()
         );
@@ -36,7 +38,7 @@ public record InventoryResponseDTO(
 
     public static List<InventoryResponseDTO> toDTO(List<InventoryWithMeta> inventories) {
         return inventories.stream()
-                .map(i -> toDTO(i.inventory(), i.isOwner(), i.userRole(), i.itemCount()))
+                .map(i -> toDTO(i.inventory(), i.isOwner(), i.userRole(), i.itemCount(), i.isFinished()))
                 .toList();
     }
 }
