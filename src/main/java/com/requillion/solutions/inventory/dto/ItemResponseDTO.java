@@ -17,12 +17,14 @@ public record ItemResponseDTO(
         boolean isAssigned,
         String assignedToName,
         boolean currentUserClaimed,
+        boolean assignedToCurrentUser,
         boolean isCollected,
         Instant createdAt,
         Instant updatedAt
 ) {
     public static ItemResponseDTO toDTO(Item item, int claimCount, boolean isAssigned,
-                                         String assignedToName, boolean currentUserClaimed) {
+                                         String assignedToName, boolean currentUserClaimed,
+                                         boolean assignedToCurrentUser) {
         return new ItemResponseDTO(
                 item.getId(),
                 item.getInventory().getId(),
@@ -35,6 +37,7 @@ public record ItemResponseDTO(
                 isAssigned,
                 assignedToName,
                 currentUserClaimed,
+                assignedToCurrentUser,
                 item.getIsCollected(),
                 item.getCreatedAt(),
                 item.getUpdatedAt()

@@ -249,9 +249,9 @@ public class ItemService {
                         "Inventory not found",
                         "Inventory: %s", inventoryId));
 
-        if (!inventoryService.canUserEditInventory(user, inventory)) {
+        if (!inventoryService.canUserViewInventory(user, inventory)) {
             throw new NotAuthorizedException(
-                    "You do not have permission to collect items in this inventory",
+                    "You do not have access to this inventory",
                     "Inventory: %s, User: %s", inventoryId, user.getId());
         }
 
@@ -259,6 +259,16 @@ public class ItemService {
                 .orElseThrow(() -> new NotFoundException(
                         "Item not found",
                         "Item: %s, Inventory: %s", itemId, inventoryId));
+
+        boolean canEdit = inventoryService.canUserEditInventory(user, inventory);
+        boolean isAssignedToUser = claimRepository.findByItem(item).stream()
+                .anyMatch(c -> c.getStatus() == ClaimStatus.ASSIGNED && c.getUser().equals(user));
+
+        if (!canEdit && !isAssignedToUser) {
+            throw new NotAuthorizedException(
+                    "You do not have permission to collect this item",
+                    "Item: %s, User: %s", itemId, user.getId());
+        }
 
         if (!claimRepository.existsByItemAndStatus(item, ClaimStatus.ASSIGNED)) {
             throw new BadInputException(
@@ -441,8 +451,9 @@ public class ItemService {
                     : null;
             boolean currentUserClaimed = itemClaims.stream()
                     .anyMatch(c -> c.getUser().equals(user));
+            boolean assignedToCurrentUser = assigned != null && assigned.getUser().equals(user);
 
-            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed);
+            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed, assignedToCurrentUser);
         }).toList();
     }
 
@@ -451,7 +462,7 @@ public class ItemService {
                                                     byte[] imageData) {
         Item item = createItemInCategory(user, inventoryId, categoryId, dto, imageData);
         // New items have no claims
-        return ItemResponseDTO.toDTO(item, 0, false, null, false);
+        return ItemResponseDTO.toDTO(item, 0, false, null, false, false);
     }
 
     public List<ItemWithThumbnailDTO> getClaimedItemsWithThumbnails(@NonNull User user,
@@ -494,8 +505,9 @@ public class ItemService {
                     ? assigned.getUser().getFirstName() + " " + assigned.getUser().getLastName()
                     : null;
             boolean currentUserClaimed = true;
+            boolean assignedToCurrentUser = assigned != null && assigned.getUser().equals(user);
 
-            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed);
+            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed, assignedToCurrentUser);
         }).toList();
     }
 
@@ -529,8 +541,9 @@ public class ItemService {
                     : null;
             boolean currentUserClaimed = itemClaims.stream()
                     .anyMatch(c -> c.getUser().equals(user));
+            boolean assignedToCurrentUser = assigned != null && assigned.getUser().equals(user);
 
-            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed);
+            return ItemWithThumbnailDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed, assignedToCurrentUser);
         }).toList();
     }
 
@@ -543,7 +556,7 @@ public class ItemService {
                                           @NonNull ItemRequestDTO dto, byte[] imageData) {
         Item item = createItem(user, inventoryId, dto, imageData);
         // New items have no claims
-        return ItemResponseDTO.toDTO(item, 0, false, null, false);
+        return ItemResponseDTO.toDTO(item, 0, false, null, false, false);
     }
 
     public ItemResponseDTO updateItemDTO(@NonNull User user, @NonNull UUID inventoryId,
@@ -575,6 +588,8 @@ public class ItemService {
         boolean currentUserClaimed = claims.stream()
                 .anyMatch(c -> c.getUser().equals(user));
 
-        return ItemResponseDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed);
+        boolean assignedToCurrentUser = assigned != null && assigned.getUser().equals(user);
+
+        return ItemResponseDTO.toDTO(item, claimCount, isAssigned, assignedToName, currentUserClaimed, assignedToCurrentUser);
     }
 }
