@@ -1,5 +1,7 @@
 package com.requillion.solutions.inventory.service;
 
+import com.requillion.solutions.inventory.dto.AllClaimsResponseDTO;
+import com.requillion.solutions.inventory.dto.ClaimedItemDTO;
 import com.requillion.solutions.inventory.dto.InventoryEventDTO;
 import com.requillion.solutions.inventory.exception.BadInputException;
 import com.requillion.solutions.inventory.exception.NotAuthorizedException;
@@ -16,8 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -181,6 +183,66 @@ public class ClaimService {
         LoggerUtil.info(log, "Admin %s removed claim %s from item %s", user.getId(), claimId, itemId);
 
         eventService.publishEvent(InventoryEventDTO.claimDeleted(inventoryId, itemId, claimId));
+    }
+
+    public List<AllClaimsResponseDTO> getAllClaims(@NonNull User user, @NonNull UUID inventoryId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        if (!canUserManageInventory(user, inventory)) {
+            throw new NotAuthorizedException(
+                    "You do not have permission to view all claims",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        // Get all active admins and claimants
+        List<InventoryMember> members = memberRepository.findByInventoryAndStatusAndRoleIn(
+                inventory, MemberStatus.ACTIVE, List.of(MemberRole.ADMIN, MemberRole.CLAIMANT));
+
+        // Include the owner
+        User owner = inventory.getOwner();
+
+        // Get all claims for this inventory
+        List<ItemClaim> allClaims = claimRepository.findAllByInventoryId(inventoryId);
+
+        // Group claims by user ID
+        Map<UUID, List<ItemClaim>> claimsByUser = allClaims.stream()
+                .collect(Collectors.groupingBy(c -> c.getUser().getId()));
+
+        // Count claims per item
+        Map<UUID, Long> claimCountByItem = allClaims.stream()
+                .collect(Collectors.groupingBy(c -> c.getItem().getId(), Collectors.counting()));
+
+        // Build response: owner first, then members sorted by name
+        List<AllClaimsResponseDTO> result = new ArrayList<>();
+
+        // Add owner
+        result.add(buildMemberClaims(owner.getId(),
+                owner.getFirstName() + " " + owner.getLastName(),
+                null, claimsByUser, claimCountByItem));
+
+        // Add members (excluding owner to avoid duplicates)
+        for (InventoryMember member : members) {
+            if (member.getUser().equals(owner)) continue;
+            result.add(buildMemberClaims(member.getUser().getId(),
+                    member.getUser().getFirstName() + " " + member.getUser().getLastName(),
+                    member.getRole(), claimsByUser, claimCountByItem));
+        }
+
+        return result;
+    }
+
+    private AllClaimsResponseDTO buildMemberClaims(UUID userId, String userName, MemberRole role,
+                                                    Map<UUID, List<ItemClaim>> claimsByUser,
+                                                    Map<UUID, Long> claimCountByItem) {
+        List<ItemClaim> userClaims = claimsByUser.getOrDefault(userId, List.of());
+        List<ClaimedItemDTO> claimedItems = userClaims.stream()
+                .map(claim -> ClaimedItemDTO.fromClaim(claim,
+                        claimCountByItem.getOrDefault(claim.getItem().getId(), 0L).intValue()))
+                .toList();
+        return new AllClaimsResponseDTO(userId, userName, role, claimedItems);
     }
 
     private Item getItemWithAccess(User user, UUID inventoryId, UUID itemId) {

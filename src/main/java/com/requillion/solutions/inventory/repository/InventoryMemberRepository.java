@@ -24,4 +24,7 @@ public interface InventoryMemberRepository extends JpaRepository<InventoryMember
 
     List<InventoryMember> findByInventoryAndRoleAndStatus(
             Inventory inventory, MemberRole role, MemberStatus status);
+
+    List<InventoryMember> findByInventoryAndStatusAndRoleIn(
+            Inventory inventory, MemberStatus status, List<MemberRole> roles);
 }

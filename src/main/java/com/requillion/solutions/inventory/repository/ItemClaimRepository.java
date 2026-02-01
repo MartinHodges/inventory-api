@@ -34,4 +34,10 @@ public interface ItemClaimRepository extends JpaRepository<ItemClaim, UUID> {
            "WHERE i.inventory.id = :inventoryId AND c.user = :user AND i.isDeleted = false " +
            "ORDER BY i.referenceNumber ASC")
     List<ItemClaim> findByUserAndInventoryId(@Param("user") User user, @Param("inventoryId") UUID inventoryId);
+
+    @Query("SELECT c FROM ItemClaim c JOIN FETCH c.item i JOIN FETCH c.user u " +
+           "LEFT JOIN FETCH i.category " +
+           "WHERE i.inventory.id = :inventoryId AND i.isDeleted = false " +
+           "ORDER BY u.lastName ASC, u.firstName ASC, i.referenceNumber ASC")
+    List<ItemClaim> findAllByInventoryId(@Param("inventoryId") UUID inventoryId);
 }
