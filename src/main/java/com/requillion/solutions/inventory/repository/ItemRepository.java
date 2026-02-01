@@ -18,6 +18,8 @@ public interface ItemRepository extends JpaRepository<Item, UUID> {
 
     List<Item> findByInventoryAndIsDeletedFalseOrderByReferenceNumberAsc(Inventory inventory);
 
+    List<Item> findByInventoryAndIsDeletedFalseAndIsCollectedFalseOrderByReferenceNumberAsc(Inventory inventory);
+
     Optional<Item> findByIdAndIsDeletedFalse(UUID id);
 
     Optional<Item> findByInventoryAndIdAndIsDeletedFalse(Inventory inventory, UUID id);
@@ -28,6 +30,8 @@ public interface ItemRepository extends JpaRepository<Item, UUID> {
     long countByInventoryAndIsDeletedFalse(Inventory inventory);
 
     List<Item> findByCategoryAndIsDeletedFalseOrderByReferenceNumberAsc(Category category);
+
+    List<Item> findByCategoryAndIsDeletedFalseAndIsCollectedFalseOrderByReferenceNumberAsc(Category category);
 
     List<Item> findByCategoryOrderByReferenceNumberAsc(Category category);
 

@@ -40,4 +40,12 @@ public record InventoryEventDTO(
     public static InventoryEventDTO itemUnassigned(UUID inventoryId, UUID itemId) {
         return new InventoryEventDTO("ITEM_UNASSIGNED", inventoryId, itemId, null, System.currentTimeMillis());
     }
+
+    public static InventoryEventDTO itemCollected(UUID inventoryId, UUID itemId) {
+        return new InventoryEventDTO("ITEM_COLLECTED", inventoryId, itemId, null, System.currentTimeMillis());
+    }
+
+    public static InventoryEventDTO itemUncollected(UUID inventoryId, UUID itemId) {
+        return new InventoryEventDTO("ITEM_UNCOLLECTED", inventoryId, itemId, null, System.currentTimeMillis());
+    }
 }

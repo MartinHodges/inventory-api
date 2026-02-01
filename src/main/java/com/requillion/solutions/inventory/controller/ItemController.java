@@ -101,6 +101,26 @@ public class ItemController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{itemId}/collect")
+    public ResponseEntity<Void> collectItem(
+            @PathVariable UUID inventoryId,
+            @PathVariable UUID itemId) {
+        LoggerUtil.debug(log, "collectItem: inventory=%s, item=%s", inventoryId, itemId);
+        RequestContext context = UserContext.getContext();
+        itemService.collectItem(context.getUser(), inventoryId, itemId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{itemId}/uncollect")
+    public ResponseEntity<Void> uncollectItem(
+            @PathVariable UUID inventoryId,
+            @PathVariable UUID itemId) {
+        LoggerUtil.debug(log, "uncollectItem: inventory=%s, item=%s", inventoryId, itemId);
+        RequestContext context = UserContext.getContext();
+        itemService.uncollectItem(context.getUser(), inventoryId, itemId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{itemId}/image")
     public ResponseEntity<byte[]> getItemImage(
             @PathVariable UUID inventoryId,

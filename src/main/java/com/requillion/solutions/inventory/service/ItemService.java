@@ -49,7 +49,22 @@ public class ItemService {
                     "Inventory: %s, User: %s", inventoryId, user.getId());
         }
 
-        List<Item> items = itemRepository.findByInventoryAndIsDeletedFalseOrderByReferenceNumberAsc(inventory);
+        boolean canEdit = inventoryService.canUserEditInventory(user, inventory);
+        List<Item> items;
+        if (canEdit) {
+            items = itemRepository.findByInventoryAndIsDeletedFalseOrderByReferenceNumberAsc(inventory);
+        } else {
+            items = itemRepository.findByInventoryAndIsDeletedFalseOrderByReferenceNumberAsc(inventory);
+            Set<UUID> userAssignedItemIds = claimRepository.findByItemIdIn(
+                    items.stream().filter(i -> i.getIsCollected()).map(Item::getId).toList()
+            ).stream()
+                    .filter(c -> c.getStatus() == ClaimStatus.ASSIGNED && c.getUser().equals(user))
+                    .map(c -> c.getItem().getId())
+                    .collect(Collectors.toSet());
+            items = items.stream()
+                    .filter(i -> !i.getIsCollected() || userAssignedItemIds.contains(i.getId()))
+                    .toList();
+        }
         LoggerUtil.info(log, "Retrieved %d items from inventory %s", items.size(), inventoryId);
         return items;
     }
@@ -228,6 +243,60 @@ public class ItemService {
         eventService.publishEvent(InventoryEventDTO.itemUndeleted(inventoryId, itemId));
     }
 
+    public void collectItem(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID itemId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        if (!inventoryService.canUserEditInventory(user, inventory)) {
+            throw new NotAuthorizedException(
+                    "You do not have permission to collect items in this inventory",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        Item item = itemRepository.findByInventoryAndIdAndIsDeletedFalse(inventory, itemId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Item not found",
+                        "Item: %s, Inventory: %s", itemId, inventoryId));
+
+        if (!claimRepository.existsByItemAndStatus(item, ClaimStatus.ASSIGNED)) {
+            throw new BadInputException(
+                    "Item must be assigned before it can be collected",
+                    "Item: %s is not assigned", itemId);
+        }
+
+        item.setIsCollected(true);
+        itemRepository.save(item);
+
+        LoggerUtil.info(log, "Collected item %s from inventory %s", itemId, inventoryId);
+        eventService.publishEvent(InventoryEventDTO.itemCollected(inventoryId, itemId));
+    }
+
+    public void uncollectItem(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID itemId) {
+        Inventory inventory = inventoryRepository.findById(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        if (!inventoryService.canUserEditInventory(user, inventory)) {
+            throw new NotAuthorizedException(
+                    "You do not have permission to uncollect items in this inventory",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        Item item = itemRepository.findByInventoryAndId(inventory, itemId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Item not found",
+                        "Item: %s, Inventory: %s", itemId, inventoryId));
+
+        item.setIsCollected(false);
+        itemRepository.save(item);
+
+        LoggerUtil.info(log, "Uncollected item %s from inventory %s", itemId, inventoryId);
+        eventService.publishEvent(InventoryEventDTO.itemUncollected(inventoryId, itemId));
+    }
+
     public byte[] getItemImage(@NonNull User user, @NonNull UUID inventoryId, @NonNull UUID itemId) {
         Item item = getItem(user, inventoryId, itemId);
 
@@ -272,10 +341,23 @@ public class ItemService {
                         "Category: %s, Inventory: %s", categoryId, inventoryId));
 
         boolean canEdit = inventoryService.canUserEditInventory(user, inventory);
-        List<Item> items = canEdit
-                ? itemRepository.findByCategoryOrderByReferenceNumberAsc(category)
-                : itemRepository.findByCategoryAndIsDeletedFalseOrderByReferenceNumberAsc(category);
-        LoggerUtil.info(log, "Retrieved %d items from category %s (includeDeleted=%s)", items.size(), categoryId, canEdit);
+        List<Item> items;
+        if (canEdit) {
+            items = itemRepository.findByCategoryOrderByReferenceNumberAsc(category);
+        } else {
+            // Non-editors see non-deleted, non-collected items PLUS collected items assigned to them
+            items = itemRepository.findByCategoryAndIsDeletedFalseOrderByReferenceNumberAsc(category);
+            Set<UUID> userAssignedItemIds = claimRepository.findByItemIdIn(
+                    items.stream().filter(i -> i.getIsCollected()).map(Item::getId).toList()
+            ).stream()
+                    .filter(c -> c.getStatus() == ClaimStatus.ASSIGNED && c.getUser().equals(user))
+                    .map(c -> c.getItem().getId())
+                    .collect(Collectors.toSet());
+            items = items.stream()
+                    .filter(i -> !i.getIsCollected() || userAssignedItemIds.contains(i.getId()))
+                    .toList();
+        }
+        LoggerUtil.info(log, "Retrieved %d items from category %s (canEdit=%s)", items.size(), categoryId, canEdit);
         return items;
     }
 

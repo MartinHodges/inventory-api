@@ -17,6 +17,7 @@ public record ItemResponseDTO(
         boolean isAssigned,
         String assignedToName,
         boolean currentUserClaimed,
+        boolean isCollected,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -34,6 +35,7 @@ public record ItemResponseDTO(
                 isAssigned,
                 assignedToName,
                 currentUserClaimed,
+                item.getIsCollected(),
                 item.getCreatedAt(),
                 item.getUpdatedAt()
         );
