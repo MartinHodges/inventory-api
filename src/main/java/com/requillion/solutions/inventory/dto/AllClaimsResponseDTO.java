@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record AllClaimsResponseDTO(
+        UUID userId,
         UUID memberId,
         String userName,
         MemberRole role,

@@ -224,24 +224,29 @@ public class ClaimService {
         // Build response: owner first, then members sorted by name
         List<AllClaimsResponseDTO> result = new ArrayList<>();
 
-        // Add owner (owner never has finished status)
-        result.add(buildMemberClaims(owner.getId(),
+        // Add owner (owner never has finished status, no member record)
+        result.add(buildMemberClaims(owner.getId(), null,
                 owner.getFirstName() + " " + owner.getLastName(),
                 null, false, claimsByUser, claimCountByItem));
 
-        // Add members (excluding owner to avoid duplicates)
-        for (InventoryMember member : members) {
-            if (member.getUser().equals(owner)) continue;
-            result.add(buildMemberClaims(member.getUser().getId(),
-                    member.getUser().getFirstName() + " " + member.getUser().getLastName(),
-                    member.getRole(), member.getFinishedAt() != null, claimsByUser, claimCountByItem));
-        }
+        // Add members (excluding owner to avoid duplicates), sorted by name
+        members.stream()
+                .filter(member -> !member.getUser().equals(owner))
+                .sorted((a, b) -> {
+                    String nameA = a.getUser().getFirstName() + " " + a.getUser().getLastName();
+                    String nameB = b.getUser().getFirstName() + " " + b.getUser().getLastName();
+                    return nameA.compareToIgnoreCase(nameB);
+                })
+                .forEach(member -> result.add(buildMemberClaims(
+                        member.getUser().getId(), member.getId(),
+                        member.getUser().getFirstName() + " " + member.getUser().getLastName(),
+                        member.getRole(), member.getFinishedAt() != null, claimsByUser, claimCountByItem)));
 
         return result;
     }
 
-    private AllClaimsResponseDTO buildMemberClaims(UUID userId, String userName, MemberRole role,
-                                                    boolean isFinished,
+    private AllClaimsResponseDTO buildMemberClaims(UUID userId, UUID memberId, String userName,
+                                                    MemberRole role, boolean isFinished,
                                                     Map<UUID, List<ItemClaim>> claimsByUser,
                                                     Map<UUID, Long> claimCountByItem) {
         List<ItemClaim> userClaims = claimsByUser.getOrDefault(userId, List.of());
@@ -249,7 +254,7 @@ public class ClaimService {
                 .map(claim -> ClaimedItemDTO.fromClaim(claim,
                         claimCountByItem.getOrDefault(claim.getItem().getId(), 0L).intValue()))
                 .toList();
-        return new AllClaimsResponseDTO(userId, userName, role, isFinished, claimedItems);
+        return new AllClaimsResponseDTO(userId, memberId, userName, role, isFinished, claimedItems);
     }
 
     private Item getItemWithAccess(User user, UUID inventoryId, UUID itemId) {
