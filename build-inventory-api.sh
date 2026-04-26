@@ -5,9 +5,10 @@
 #
 # Options:
 #   -i, --image IMAGE_NAME    Image name (e.g., myregistry.com/all-i-want or all-i-want)
-#   -t, --tag TAG            Tag for the image (default: git commit hash or 'latest')
+#   -t, --tag TAG            Tag for the image (default: timestamp YYYYMMDD-HHMMSS)
 #   -a, --also-tag TAG       Additional tag to apply (can be used multiple times)
 #   -r, --registry REGISTRY  Container registry (e.g., docker.io, ghcr.io)
+#   --latest                 Use 'latest' tag instead of timestamp (for backwards compatibility)
 #   --no-push                Build only, don't push to registry
 #   --no-cache               Build without using cache
 #   --no-rollout             Skip rollout after successful push
@@ -16,15 +17,18 @@
 set -e  # Exit on error
 
 # Default values
-IMAGE_NAME="martinhodges/inventory-api"
-TAG="latest"
+IMAGE_NAME="dr.requillion-solutions.cloud/inventory-api"
+TAG=""
 ADDITIONAL_TAGS=()
 REGISTRY=""
 PUSH=true
 ROLLOUT=true
 NO_CACHE=""
+USE_LATEST=false
 PLATFORM="linux/amd64"
-SSH_HOST="kates"
+SSH_HOST="kates.home.b30"
+SSH_PORT="22"
+SSH_USER="server-admin"
 SSH_ROLLOUT_COMMAND="~/k8s/inventory/rollout.sh api"
 
 # Parse command line arguments
@@ -45,6 +49,10 @@ while [[ $# -gt 0 ]]; do
     -r|--registry)
       REGISTRY="$2"
       shift 2
+      ;;
+    --latest)
+      USE_LATEST=true
+      shift
       ;;
     --no-push)
       PUSH=false
@@ -77,14 +85,15 @@ if [ -z "$IMAGE_NAME" ]; then
   exit 1
 fi
 
-# Determine tag if not specified
+# Determine tag if not explicitly specified
 if [ -z "$TAG" ]; then
-  if git rev-parse --git-dir > /dev/null 2>&1; then
-    TAG=$(git rev-parse --short HEAD)
-    echo "Using git commit hash as tag: $TAG"
-  else
+  if [ "$USE_LATEST" = true ]; then
     TAG="latest"
-    echo "Not a git repository, using tag: $TAG"
+    echo "Using tag: $TAG"
+  else
+    # Default: generate timestamp tag for garbage collection
+    TAG=$(date -u +"%Y%m%d-%H%M%S")
+    echo "Generated timestamp tag: $TAG"
   fi
 fi
 
@@ -148,9 +157,12 @@ fi
 if [ "$ROLLOUT" = true ] && [ "$PUSH" = true ]; then
   echo ""
   echo "======================================"
-  echo "Triggering rollout on kates..."
+  echo "Triggering rollout on $SSH_HOST..."
   echo "======================================"
-  if ssh $SSH_HOST "$SSH_ROLLOUT_COMMAND"; then
+  # Pass tag and image to rollout script for kubectl set image
+  ROLLOUT_CMD="${SSH_ROLLOUT_COMMAND} ${TAG} ${FULL_IMAGE}"
+  echo "Running: $ROLLOUT_CMD"
+  if ssh -p $SSH_PORT ${SSH_USER:+$SSH_USER@}$SSH_HOST "$ROLLOUT_CMD"; then
     echo "✓ Rollout completed successfully"
   else
     echo "✗ Rollout failed"
