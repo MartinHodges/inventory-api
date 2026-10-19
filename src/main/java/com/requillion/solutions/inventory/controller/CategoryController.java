@@ -3,6 +3,7 @@ package com.requillion.solutions.inventory.controller;
 import com.requillion.solutions.inventory.dto.CategoryRecentItemCountDTO;
 import com.requillion.solutions.inventory.dto.CategoryRequestDTO;
 import com.requillion.solutions.inventory.dto.CategoryResponseDTO;
+import com.requillion.solutions.inventory.dto.CategorySearchMatchDTO;
 import com.requillion.solutions.inventory.dto.CategoryVisibilityDTO;
 import com.requillion.solutions.inventory.dto.CategoryWithItemCount;
 import com.requillion.solutions.inventory.model.Category;
@@ -98,6 +99,17 @@ public class CategoryController {
         List<CategoryRecentItemCountDTO> counts = categoryService.getRecentItemCounts(
                 context.getUser(), inventoryId, days);
         return ResponseEntity.ok(counts);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<CategorySearchMatchDTO>> searchCategories(
+            @PathVariable UUID inventoryId,
+            @RequestParam(defaultValue = "") String q) {
+        LoggerUtil.debug(log, "searchCategories: inventory=%s, q=%s", inventoryId, q);
+        RequestContext context = UserContext.getContext();
+        List<CategorySearchMatchDTO> matches = categoryService.searchCategories(
+                context.getUser(), inventoryId, q);
+        return ResponseEntity.ok(matches);
     }
 
     @PutMapping("/reorder")

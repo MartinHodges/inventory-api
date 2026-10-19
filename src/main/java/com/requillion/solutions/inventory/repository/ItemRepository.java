@@ -49,4 +49,9 @@ public interface ItemRepository extends JpaRepository<Item, UUID> {
             "AND (i.createdAt >= :since OR i.updatedAt >= :since) " +
             "GROUP BY i.category.id")
     List<Object[]> countRecentItemsByCategory(@Param("inventory") Inventory inventory, @Param("since") Instant since);
+
+    // Lightweight projection for searching (avoids loading image data)
+    @Query("SELECT i.id, i.category.id, i.referenceNumber, i.description, i.isCollected " +
+            "FROM Item i WHERE i.inventory = :inventory AND i.isDeleted = false AND i.category IS NOT NULL")
+    List<Object[]> findSearchableItems(@Param("inventory") Inventory inventory);
 }

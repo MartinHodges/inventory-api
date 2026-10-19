@@ -2,15 +2,18 @@ package com.requillion.solutions.inventory.service;
 
 import com.requillion.solutions.inventory.dto.CategoryRecentItemCountDTO;
 import com.requillion.solutions.inventory.dto.CategoryRequestDTO;
+import com.requillion.solutions.inventory.dto.CategorySearchMatchDTO;
 import com.requillion.solutions.inventory.dto.CategoryWithItemCount;
 import com.requillion.solutions.inventory.exception.BadInputException;
 import com.requillion.solutions.inventory.exception.NotAuthorizedException;
 import com.requillion.solutions.inventory.exception.NotFoundException;
 import com.requillion.solutions.inventory.model.Category;
+import com.requillion.solutions.inventory.model.ClaimStatus;
 import com.requillion.solutions.inventory.model.Inventory;
 import com.requillion.solutions.inventory.model.User;
 import com.requillion.solutions.inventory.repository.CategoryRepository;
 import com.requillion.solutions.inventory.repository.InventoryRepository;
+import com.requillion.solutions.inventory.repository.ItemClaimRepository;
 import com.requillion.solutions.inventory.repository.ItemRepository;
 import com.requillion.solutions.inventory.util.LoggerUtil;
 import lombok.NonNull;
@@ -21,7 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -35,6 +42,7 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final InventoryRepository inventoryRepository;
     private final ItemRepository itemRepository;
+    private final ItemClaimRepository claimRepository;
     private final InventoryService inventoryService;
 
     public List<CategoryWithItemCount> getCategories(@NonNull User user, @NonNull UUID inventoryId) {
@@ -208,6 +216,55 @@ public class CategoryService {
                         ((Number) row[1]).intValue(),
                         ((Number) row[2]).intValue()))
                 .toList();
+    }
+
+    public List<CategorySearchMatchDTO> searchCategories(@NonNull User user, @NonNull UUID inventoryId, String query) {
+        Inventory inventory = getInventoryWithAccess(user, inventoryId);
+        boolean canEdit = inventoryService.canUserEditInventory(user, inventory);
+
+        List<String> keywords = query == null ? List.of() : Arrays.stream(query.toLowerCase().split("\\s+"))
+                .filter(k -> !k.isBlank())
+                .toList();
+        if (keywords.isEmpty()) {
+            return List.of();
+        }
+
+        List<Object[]> rows = itemRepository.findSearchableItems(inventory);
+
+        // Users who can't edit only see collected items that are assigned to them
+        Set<UUID> assignedCollectedIds = Set.of();
+        if (!canEdit) {
+            List<UUID> collectedIds = rows.stream()
+                    .filter(row -> Boolean.TRUE.equals(row[4]))
+                    .map(row -> (UUID) row[0])
+                    .toList();
+            if (!collectedIds.isEmpty()) {
+                assignedCollectedIds = claimRepository.findByItemIdIn(collectedIds).stream()
+                        .filter(c -> c.getStatus() == ClaimStatus.ASSIGNED && c.getUser().equals(user))
+                        .map(c -> c.getItem().getId())
+                        .collect(Collectors.toSet());
+            }
+        }
+
+        Map<UUID, Integer> matchCounts = new HashMap<>();
+        for (Object[] row : rows) {
+            boolean visible = canEdit || !Boolean.TRUE.equals(row[4]) || assignedCollectedIds.contains((UUID) row[0]);
+            if (visible && matchesAll(row[2] + " " + row[3], keywords)) {
+                matchCounts.merge((UUID) row[1], 1, Integer::sum);
+            }
+        }
+
+        return categoryRepository.findByInventoryOrderByDisplayOrderAsc(inventory).stream()
+                .filter(cat -> canEdit || !cat.getHidden())
+                .filter(cat -> matchCounts.containsKey(cat.getId())
+                        || matchesAll(cat.getName() + " " + Objects.toString(cat.getDescription(), ""), keywords))
+                .map(cat -> new CategorySearchMatchDTO(cat.getId(), matchCounts.getOrDefault(cat.getId(), 0)))
+                .toList();
+    }
+
+    private static boolean matchesAll(String text, List<String> keywords) {
+        String lower = text.toLowerCase();
+        return keywords.stream().allMatch(lower::contains);
     }
 
     private Inventory getInventoryWithAccess(User user, UUID inventoryId) {

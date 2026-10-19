@@ -3,6 +3,7 @@ package com.requillion.solutions.inventory.controller;
 import com.requillion.solutions.inventory.dto.ItemRequestDTO;
 import com.requillion.solutions.inventory.dto.ItemResponseDTO;
 import com.requillion.solutions.inventory.dto.ItemWithThumbnailDTO;
+import com.requillion.solutions.inventory.dto.MoveItemRequestDTO;
 import com.requillion.solutions.inventory.security.RequestContext;
 import com.requillion.solutions.inventory.security.UserContext;
 import com.requillion.solutions.inventory.service.ItemService;
@@ -77,6 +78,17 @@ public class ItemController {
         LoggerUtil.debug(log, "updateItem: inventory=%s, item=%s", inventoryId, itemId);
         RequestContext context = UserContext.getContext();
         ItemResponseDTO item = itemService.updateItemDTO(context.getUser(), inventoryId, itemId, dto);
+        return ResponseEntity.ok(item);
+    }
+
+    @PatchMapping("/{itemId}/move")
+    public ResponseEntity<ItemResponseDTO> moveItem(
+            @PathVariable UUID inventoryId,
+            @PathVariable UUID itemId,
+            @Valid @RequestBody MoveItemRequestDTO dto) {
+        LoggerUtil.debug(log, "moveItem: inventory=%s, item=%s, category=%s", inventoryId, itemId, dto.categoryId());
+        RequestContext context = UserContext.getContext();
+        ItemResponseDTO item = itemService.moveItemDTO(context.getUser(), inventoryId, itemId, dto.categoryId());
         return ResponseEntity.ok(item);
     }
 

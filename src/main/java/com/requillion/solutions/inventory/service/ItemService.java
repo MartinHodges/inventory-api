@@ -160,6 +160,50 @@ public class ItemService {
         return item;
     }
 
+    public Item moveItem(@NonNull User user, @NonNull UUID inventoryId,
+                         @NonNull UUID itemId, @NonNull UUID categoryId) {
+        // Use pessimistic lock to prevent race condition on reference number generation
+        Inventory inventory = inventoryRepository.findByIdWithLock(inventoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Inventory not found",
+                        "Inventory: %s", inventoryId));
+
+        if (!inventoryService.canUserEditInventory(user, inventory)) {
+            throw new NotAuthorizedException(
+                    "You do not have permission to move items in this inventory",
+                    "Inventory: %s, User: %s", inventoryId, user.getId());
+        }
+
+        Item item = itemRepository.findByInventoryAndIdAndIsDeletedFalse(inventory, itemId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Item not found",
+                        "Item: %s, Inventory: %s", itemId, inventoryId));
+
+        Category category = categoryRepository.findByInventoryAndId(inventory, categoryId)
+                .orElseThrow(() -> new NotFoundException(
+                        "Category not found",
+                        "Category: %s, Inventory: %s", categoryId, inventoryId));
+
+        if (category.equals(item.getCategory())) {
+            return item;
+        }
+
+        // Reference numbers are unique per category, so allocate a new one in the target
+        Integer maxRef = itemRepository.findMaxReferenceNumberByCategory(category);
+        int newRefNumber = (maxRef != null ? maxRef : 0) + 1;
+        int oldRefNumber = item.getReferenceNumber();
+
+        item.setCategory(category);
+        item.setReferenceNumber(newRefNumber);
+        item = itemRepository.save(item);
+
+        LoggerUtil.info(log, "Moved item %s (#%d -> #%d) to category %s",
+                item.getId(), oldRefNumber, newRefNumber, categoryId);
+        eventService.publishEvent(InventoryEventDTO.itemUpdated(inventoryId, item.getId()));
+
+        return item;
+    }
+
     public Item updateItemImage(@NonNull User user, @NonNull UUID inventoryId,
                                 @NonNull UUID itemId, @NonNull byte[] imageData) {
         Inventory inventory = inventoryRepository.findById(inventoryId)
@@ -562,6 +606,12 @@ public class ItemService {
     public ItemResponseDTO updateItemDTO(@NonNull User user, @NonNull UUID inventoryId,
                                           @NonNull UUID itemId, @NonNull ItemRequestDTO dto) {
         Item item = updateItem(user, inventoryId, itemId, dto);
+        return buildItemResponseDTO(item, user);
+    }
+
+    public ItemResponseDTO moveItemDTO(@NonNull User user, @NonNull UUID inventoryId,
+                                        @NonNull UUID itemId, @NonNull UUID categoryId) {
+        Item item = moveItem(user, inventoryId, itemId, categoryId);
         return buildItemResponseDTO(item, user);
     }
 
