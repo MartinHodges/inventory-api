@@ -5,7 +5,7 @@ Spring Boot backend API for the Inventory Management application.
 ## Tech Stack
 
 - Java 21
-- Spring Boot 3.4.1
+- Spring Boot 3.5.16
 - PostgreSQL with Flyway migrations
 - Maven build
 
