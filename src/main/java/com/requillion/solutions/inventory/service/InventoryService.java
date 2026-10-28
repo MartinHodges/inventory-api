@@ -148,6 +148,9 @@ public class InventoryService {
         inventory.setOwner(owner);
         inventory.setName(dto.name());
         inventory.setDescription(dto.description());
+        if (dto.moving() != null) {
+            inventory.setMoving(dto.moving());
+        }
 
         inventory = inventoryRepository.save(inventory);
         LoggerUtil.info(log, "Created inventory %s for user %s", inventory.getId(), owner.getId());
@@ -180,6 +183,9 @@ public class InventoryService {
 
         inventory.setName(dto.name());
         inventory.setDescription(dto.description());
+        if (dto.moving() != null) {
+            inventory.setMoving(dto.moving());
+        }
 
         inventory = inventoryRepository.save(inventory);
         LoggerUtil.info(log, "Updated inventory %s", inventory.getId());

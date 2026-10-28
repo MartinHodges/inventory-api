@@ -9,5 +9,8 @@ public record InventoryRequestDTO(
         String name,
 
         @Size(max = 1000, message = "Description must be less than 1000 characters")
-        String description
+        String description,
+
+        // Null leaves the existing value unchanged
+        Boolean moving
 ) {}

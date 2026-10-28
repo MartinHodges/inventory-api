@@ -17,6 +17,7 @@ public record InventoryResponseDTO(
         MemberRole userRole,
         int itemCount,
         boolean isFinished,
+        boolean isMoving,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -31,6 +32,7 @@ public record InventoryResponseDTO(
                 isOwner ? MemberRole.ADMIN : userRole,
                 itemCount,
                 isFinished,
+                Boolean.TRUE.equals(inventory.getMoving()),
                 inventory.getCreatedAt(),
                 inventory.getUpdatedAt()
         );

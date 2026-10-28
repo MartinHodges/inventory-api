@@ -16,6 +16,7 @@ import com.requillion.solutions.inventory.repository.InventoryRepository;
 import com.requillion.solutions.inventory.repository.ItemClaimRepository;
 import com.requillion.solutions.inventory.repository.ItemRepository;
 import com.requillion.solutions.inventory.util.LoggerUtil;
+import com.requillion.solutions.inventory.util.MovingBoxNames;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +51,11 @@ public class CategoryService {
         boolean canEdit = inventoryService.canUserEditInventory(user, inventory);
 
         List<Category> categories = categoryRepository.findByInventoryOrderByDisplayOrderAsc(inventory);
+        if (Boolean.TRUE.equals(inventory.getMoving())) {
+            categories = categories.stream()
+                    .sorted(MovingBoxNames.comparing(Category::getName))
+                    .toList();
+        }
 
         return categories.stream()
                 .filter(cat -> canEdit || !cat.getHidden())
@@ -78,11 +84,20 @@ public class CategoryService {
     public Category createCategory(@NonNull User user, @NonNull UUID inventoryId, @NonNull CategoryRequestDTO dto) {
         Inventory inventory = getInventoryWithEditAccess(user, inventoryId);
 
+        // In a moving inventory the name given is a room, which becomes the next box "#n room"
+        String name = dto.name();
+        if (Boolean.TRUE.equals(inventory.getMoving())) {
+            List<String> existingNames = categoryRepository.findByInventoryOrderByDisplayOrderAsc(inventory).stream()
+                    .map(Category::getName)
+                    .toList();
+            name = MovingBoxNames.nextName(name, existingNames);
+        }
+
         // Check for duplicate name
-        if (categoryRepository.findByInventoryAndName(inventory, dto.name()).isPresent()) {
+        if (categoryRepository.findByInventoryAndName(inventory, name).isPresent()) {
             throw new BadInputException(
-                    "A category named '" + dto.name() + "' already exists in this inventory",
-                    "Category name: %s, Inventory: %s", dto.name(), inventoryId);
+                    "A category named '" + name + "' already exists in this inventory",
+                    "Category name: %s, Inventory: %s", name, inventoryId);
         }
 
         // Get next display order
@@ -90,7 +105,7 @@ public class CategoryService {
 
         Category category = new Category();
         category.setInventory(inventory);
-        category.setName(dto.name());
+        category.setName(name);
         category.setDescription(dto.description());
         category.setDisplayOrder(nextOrder);
         category.setHidden(true);
